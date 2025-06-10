@@ -9,6 +9,7 @@ from collections import defaultdict
 
 def test_scalar_euler_cor(
     dt,
+    Ct,
     nStep,
     frhs,
     fsolve,
@@ -77,7 +78,7 @@ def test_scalar_euler_cor(
                 np.concatenate(
                     # [(f1_L - f0) / dt, u0, u1_L, np.array(dt).reshape(1, 1)],
                     # [(f1_L - f0) / dt, u0, u1_L],
-                    [u0, u1_L],
+                    [u0, u1_L, f0, f1_L],
                     # [u1_L],
                     axis=0,
                 ),
@@ -111,10 +112,11 @@ def test_scalar_euler_cor(
 
             # if i % 100 == 0:
             #     print(f"{i_epoch+1}, {i+1}, loss: {loss_f}")
-        print(f"{i_epoch+1}, loss: {epoch_loss}")
+        print(f"{i_epoch+1}, loss: {epoch_loss:.4e}")
 
     ret = {}
     ret["dt"] = dt
+    ret["Ct"] = Ct
     ret["nStep"] = nStep
     ret["us_bg"] = us_bg
     ret["ts_bg"] = ts_bg
@@ -122,18 +124,23 @@ def test_scalar_euler_cor(
     ret["solverC"] = solverC
     ret["frhs"] = frhs
     ret["fsolve"] = fsolve
-    return ret
+
+    others = {}
+    others["dataset"] = dataset
+
+    return ret, others
 
 
 def test_oscillator_euler_cor_eval_run(
     dt,
+    Ct,
     nStep,
     dt_expand_scale,
     us_bg,
     ts_bg,
     model,
     solverC,
-    frhs,
+    frhs: ODE.ODE_F_RHS,
     fsolve,
     test_corr_scale,
 ):
@@ -142,6 +149,7 @@ def test_oscillator_euler_cor_eval_run(
     model.eval()
 
     dtC = dt * dt_expand_scale
+    CtC = Ct * dt_expand_scale
     u = us_bg[0]
     u_nc = us_bg[0]
     t = 0
@@ -150,16 +158,17 @@ def test_oscillator_euler_cor_eval_run(
     u_ncs = [u_nc]
 
     for i in range(round(nStep / dt_expand_scale)):
-        u1 = solverC.step(dtC, u, frhs, fsolve)
-        u_nc = solverC.step(dtC, u_nc, frhs, fsolve)
+        dtCur = min(CtC * frhs.dt(u, 0, -1), dtC)
+        u1 = solverC.step(dtCur, u, frhs, fsolve)
+        u_nc = solverC.step(dtCur, u_nc, frhs, fsolve)
         f1 = frhs(u1, 1.0, 2)
         f = frhs(u, 0.0, 1)
-        f_cor = dtC * model(
+        f_cor = dtCur * model(
             torch.tensor(
                 np.concatenate(
                     # [(f1 - f) / dtC, u, u1, f, f1, np.array(dtC).reshape(1, 1)],
                     # [(f1 - f) / dtC, u, u1],
-                    [u, u1],
+                    [u, u1, f, f1],
                     # [u1],
                     dtype=np.float64,
                 )
@@ -170,9 +179,10 @@ def test_oscillator_euler_cor_eval_run(
         frhsC.b += test_corr_scale * f_cor
         # print(frhs.b)
         # print(frhsC.b)
+        print(f"{np.linalg.norm(f1):.3e} + {np.linalg.norm(f_cor):.3e}")
 
-        u = solverC.step(dtC, u, frhsC, fsolve)
-        t += dtC
+        u = solverC.step(dtCur, u, frhsC, fsolve)
+        t += dtCur
 
         us.append(u)
         ts.append(t)

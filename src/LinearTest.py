@@ -13,6 +13,15 @@ class LinearODE_FRHS(ODE.ODE_F_RHS):
         self.b = b
         if b is None:
             self.b = np.zeros((A.shape[0], 1))
+        eVal, eVec = np.linalg.eig(self.Jacobian(self.b, 0, -1))
+        maxEV = np.abs(eVal).max()
+        self.maxEV = maxEV
+
+    def Jacobian(self, u, cStage, iStage):
+        return self.A
+
+    def dt(self, u, cStage, iStage):
+        return 1 / (self.maxEV + 1e-300)
 
     def __call__(self, u, cStage, iStage):
         return self.A @ u + self.b
@@ -61,9 +70,10 @@ def test_oscillator_bg_prepare(omega=1, dt=0.01, nStep=1000):
     solverC = ODE.ESDIRK("BackwardEuler")
     A = np.array([[0, 1], [-omega, 0]], dtype=np.float64)
     frhs, fsolve = get_linear_ode(A)
-    
+
     ret = {}
     ret["dt"] = dt
+    ret["Ct"] = 1e100
     ret["nStep"] = nStep
     ret["us_bg"] = us_bg
     ret["ts_bg"] = ts_bg
@@ -76,5 +86,5 @@ def test_oscillator_bg_prepare(omega=1, dt=0.01, nStep=1000):
 
 if __name__ == "__main__":
     # us, ts = test_oscillator()
-    
+
     pass

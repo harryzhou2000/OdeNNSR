@@ -56,6 +56,11 @@ class LorenzODE_FRHS(ODE.ODE_F_RHS):
             dtype=np.float64,
         )
 
+    def dt(self, u: np.ndarray, cStage, iStage) -> float:
+        eVal, eVec = np.linalg.eig(self.Jacobian(u, cStage, iStage))
+        maxEV = np.abs(eVal).max()
+        return 1 / (maxEV + 1e-300)
+
 
 class LorenzODE_FSOVLE(ODE.ODE_F_SOLVE_SingleStage):
     def __init__(self, nIter=128, thres=1e-5):
@@ -92,7 +97,7 @@ class LorenzODE_FSOVLE(ODE.ODE_F_SOLVE_SingleStage):
 
 
 def test_lorenz_ode(
-    dt, nStep, solver: ODE.ImplicitOdeIntegrator, nIter=128, thres=1e-5
+    dt, Ct, nStep, solver: ODE.ImplicitOdeIntegrator, nIter=128, thres=1e-5
 ):
     frhs, fsolve = LorenzODE_FRHS(), LorenzODE_FSOVLE(nIter=nIter, thres=thres)
     u0 = np.array([1, 0, 0], dtype=np.float64).reshape(3, 1)
@@ -102,8 +107,9 @@ def test_lorenz_ode(
     ts = [t]
 
     for iStep in range(1, nStep + 1):
-        u = solver.step(dt, u, frhs, fsolve)
-        t += dt
+        dtCur = min(Ct * frhs.dt(u, 0, -1), dt)
+        u = solver.step(dtCur, u, frhs, fsolve)
+        t += dtCur
         us.append(u)
         ts.append(t)
 
@@ -116,7 +122,7 @@ def test_lorenz_ode(
 #     return test_linear_ode(A, u0, dt, nStep, solver)
 
 
-def test_lorenz_bg_prepare(dt=0.01, nStep=1000, nIter=128, thres=1e-5):
+def test_lorenz_bg_prepare(dt=0.01, Ct=1, nStep=1000, nIter=128, thres=1e-5):
     us_bg, ts_bg = test_lorenz_ode(
         dt=dt, nStep=nStep, solver=ODE.ESDIRK("ESDIRK4"), nIter=nIter, thres=thres
     )

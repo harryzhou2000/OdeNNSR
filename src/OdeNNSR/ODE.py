@@ -8,6 +8,14 @@ class ODE_F_RHS(ABC):
     def __call__(self, u, cStage, iStage):  # -> f(u), f == du/dt(u)
         pass
 
+    @abstractmethod
+    def Jacobian(self, u: np.ndarray, cStage, iStage):
+        pass
+
+    @abstractmethod
+    def dt(self, u: np.ndarray, cStage, iStage) -> float:
+        pass
+
 
 class ODE_F_SOLVE_SingleStage(ABC):
     @abstractmethod

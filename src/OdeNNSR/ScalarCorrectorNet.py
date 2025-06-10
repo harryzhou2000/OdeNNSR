@@ -12,18 +12,21 @@ class ScalarCorrector(nn.Module):
         self.linear1 = nn.Linear(dim, dim * 2, dtype=torch.float64)
         self.linear2 = nn.Linear(dim * 2, dim * 2, dtype=torch.float64)
         self.linear3 = nn.Linear(dim * 2, dim_out, dtype=torch.float64)
-        # nn.init.zeros_(self.linear1.weight)
-        # nn.init.zeros_(self.linear2.weight)
-        # nn.init.zeros_(self.linear3.weight)
-        # nn.init.zeros_(self.linear1.bias)
-        # nn.init.zeros_(self.linear2.bias)
-        # nn.init.zeros_(self.linear3.bias)
+        self.linearR = nn.Linear(dim, dim_out, dtype=torch.float64)
+
+        linearLayers = [
+            self.linear1,
+            self.linear2,
+            self.linear3,
+            self.linearR,
+        ]
+        # for layer in linearLayers:
+        #     nn.init.zeros_(layer.weight)
+        #     nn.init.zeros_(layer.bias)
 
     def forward(self, u):
-        v = self.linear1(u)
-        v = F.tanh(v)
-        v = self.linear2(v)
-        v = F.tanh(v)
-        v = self.linear3(v)
-        # return v * u[..., 0 : self.dim_out]
-        return v
+        v = F.tanh(self.linear1(u))
+        v = F.tanh(self.linear2(v))
+        w = self.linear3(v) 
+        # return w * u[..., 0 : self.dim_out]
+        return w
